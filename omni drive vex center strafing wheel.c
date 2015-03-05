@@ -1,3 +1,7 @@
+#pragma config(Sensor, dgtl1,  rightmaxup,     sensorTouch)
+#pragma config(Sensor, dgtl2,  rightmaxdown,   sensorTouch)
+#pragma config(Sensor, dgtl3,  leftmaxup,      sensorTouch)
+#pragma config(Sensor, dgtl4,  leftmaxdown,    sensorTouch)
 #pragma config(Motor,  port2,           left,          tmotorVex393_MC29, openLoop, reversed)
 #pragma config(Motor,  port3,           rightside,     tmotorVex393_MC29, openLoop)
 #pragma config(Motor,  port4,           center,        tmotorVex393_MC29, openLoop)
@@ -7,10 +11,15 @@
 
 task main()
 {
-
-
 	//Create "deadzone" variables. Adjust threshold value to increase/decrease deadzone
 	int X2 = 0, Y1 = 0, X1 = 0, threshold = 15;
+
+	// Two different arm motion state variables because the limit switches are independent.
+	// Positive means 'up.'
+	// Negative means 'down.'
+	// Zero means 'stay put.'
+	int leftArmMotion = 0;
+	int rightArmMotion = 0;
 
 	//Loop Forever
 	while(1 == 1)
@@ -35,7 +44,7 @@ task main()
 			X1 = 0;
 		}
 
-		//Create "deadzone" for X2/Ch1
+		//Create "deadzone" for X2/Ch1 rightarm
 		if(abs(vexRT[Ch1]) > threshold)
 		{
 			X2 = vexRT[Ch1];
@@ -51,21 +60,64 @@ task main()
 		motor[center] = X1 + X2;
 		motor[center] =  X1 - X2;
 
+		/////////////////
+		// Arm control //
+		/////////////////
 
-		if(vexRT[Btn7U] == 1)
-		{
+		// Handle movement states: left.
+		if (leftArmMotion > 0) {
 			motor[leftarm] = 127;
-			motor[rightarm] = 127;
-		}
-		else if(vexRT[Btn7D] == 1)
-		{
+			} else if (leftArmMotion < 0) {
 			motor[leftarm] = -127;
-			motor[rightarm] = -127;
-		}
-		else
-		{
+			} else if (leftArmMotion == 0) {
 			motor[leftarm] = 0;
+		}
+
+		// Handle movement states: right.
+		if (rightArmMotion > 0) {
+			motor[rightarm] = 127;
+			} else if (rightArmMotion < 0) {
+			motor[rightarm] = -127;
+			} else if (rightArmMotion == 0) {
 			motor[rightarm] = 0;
 		}
-}
+
+
+		// Handle sensory input
+		if(vexRT[Btn7U] == 1)
+		{
+			//  arms up
+			leftArmMotion = +1;
+			rightArmMotion = +1;
+
+			// This is the limit switch on the right side.  If the arm rod hits it, we've
+			// reached our vertical limit, so cancel the user's order.
+			if (SensorValue[rightmaxup] == 1) {
+				rightArmMotion = 0;
+			}
+			// limit swich on left side
+			if (SensorValue[leftmaxup] == 1) {
+				leftArmMotion = 0;
+			}
+
+		} else if (vexRT[Btn7D] == 1) {
+			//arms down
+			leftArmMotion = -1;
+			rightArmMotion = -1;
+
+			// bump swichs for max down
+			if (SensorValue[rightmaxdown] == 1) {
+				rightArmMotion = 0;
+			}
+			// limit swich on left side
+			if (SensorValue[leftmaxdown] == 1) {
+				leftArmMotion = 0;
+			}
+
+		} else {
+			// If neither button is pressed, the arms must stop immediately.
+			leftArmMotion = 0;
+			rightArmMotion = 0;
+		}
+	}
 }
